@@ -19,6 +19,8 @@ contract Dex is Wallet {
     uint256 price;
   }
 
+  uint public nextOrderId = 0;
+
   // as enum
   // order.side = Side.BUY;
   // as boolean
@@ -32,19 +34,50 @@ contract Dex is Wallet {
     //necessary as we have done it above
   }
 
-  function depositEth(bytes32 ticker, uint256 amount) public {
-    balances[msg.sender][ticker] = balances[msg.sender][ticker].add(amount);
+  function depositEth() external payable {
+    balances[msg.sender][bytes32("ETH")] = balances[msg.sender][bytes32("ETH")].add(msg.value);
 
   }
 
-  function createLimitOrder(Side side, bytes32 ticker, uint amount, uint price) public view {
+  function createLimitOrder(Side side, bytes32 ticker, uint amount, uint price) public {
       if(side == Side.BUY) {
         require(balances[msg.sender]["ETH"] >= amount.mul(price), "Not enough Eth balance");
       } else if (side == Side.SELL) {
-        require(balances[msg.sender][ticker] >= amount, "not enough token balance");
+        require(balances[msg.sender][ticker] >= amount, "Low token balance");
       }
+
+      Order[] storage orders = OrderBook[ticker][uint(side)];
+      orders.push(Order(nextOrderId, msg.sender, side, ticker, amount, price));
+
+      //Bubble sort
+      uint i = orders.length > 0 ? orders.length -1 : 0;
+      //defines the start, if array is empty it equals 0; shortened if statement
+
+      if(side == Side.BUY){
+        for (i = 0; i < orders.length -1; i++) {
+          if (orders[i].price < orders[i + 1].price) {
+            
+              Order memory swap = orders[i + 1];
+              orders[i + 1] = orders[i];
+              orders[i] = swap;
+              i++; 
+            }
+        }
+      }
+      else if(side == Side.SELL) {
+        for (i = 0; i < orders.length -1; i++) {
+          if (orders[i].price > orders[i + 1].price) {
+            
+              Order memory swap = orders[i + 1];
+              orders[i + 1] = orders[i];
+              orders[i] = swap;
+              i++; 
+            }
+        }
+        
+      }
+      nextOrderId++;
     
   }
-
 
 }
